@@ -36,46 +36,59 @@ char **getPATH(char **envp){
 }
 
 char *findPath(char **argv, char **envp){
+  char *temp = '\0';
+  // get environment variable
   char **PATH = getPATH(envp);
-
-  int exeVal;
+  // search for command
   char *local = strcat("./", *argv);
-  if(access(local, X_OK)){
-    // executable isn't in the local directory
-    char **current = PATH;
+  if(!access(local, X_OK)){
+    // executable is in local directory
+    temp = local;
+  }
+  else if(*argv[0] == '/' && !access(*argv, X_OK)){
+    // path was already provided
+    temp = *argv;
+  }
+  else{
     // search all directories in PATH
+    char **current = PATH;
     while(*current){
       *current = strcat(*current, "/");
       *current = strcat(*current, *argv);
-      print(*current);
-      print("\n");
       if(!access(*current, X_OK)){
-	return *current;
+	// found command
+	temp = *current;
 	break;
       }
       current++;
     }
   }
-  else{
-    // executable is in local directory
-    return local;
-  }
-}
-	       
-int runCommand(char **argv, char **envp){
-  // get path for the executable
-  char *path = findPath(argv, envp);
 
-  if(!*path){
-    print("command not found\n");
+  char *path = calloc(strlen(temp)+1, sizeof(char));
+  for(int i=0; temp[i]; i++)
+    path[i] = temp[i];
+  
+  free(local);
+  freeTokens(PATH);
+  free(PATH);
+  return path;
+}
+
+void runCommand(char **argv, char **envp){
+  // get path for the executable
+  char *path = findPath(argv, envp);;
+  if(*path){
+    int retVal = execve(path, argv, envp);
+    print("Program terminated with exit code \n");
+    // print exit code
+    free(path);
   }
   else {
-    
+    print("command not found\n");
   }
-  int retVal = execve(path, argv, envp);
-  print("error running command\n");
   
   free(path);
+  exit(0);
 }
 
 int main(int argc, char **argv, char **envp){
@@ -85,6 +98,7 @@ int main(int argc, char **argv, char **envp){
     write(1, "$ ", 2);
     int bufSize = read(0, buf, 128);
     buf[bufSize-1] = '\0';
+    // tokenVec will be the argv for the command
     char **tokenVec = mytoc(buf, ' ');
     
     // Check if exiting the program
@@ -95,8 +109,10 @@ int main(int argc, char **argv, char **envp){
 
     pid_t pid = fork();
     if(pid == 0)
+      // run command with child process
       runCommand(tokenVec, envp);
     else
+      // parent waits for the child to finish
       wait(NULL);
 
     freeTokens(tokenVec);
