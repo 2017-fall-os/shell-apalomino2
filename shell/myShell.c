@@ -4,12 +4,14 @@
 #include "mytoc.h"
 #include "utility.h"
 
+#include <stdio.h>
+
 void printVec(char **tokenVec){
-  print("~~~~Vector~~~~\n");
+  println("~~~~Vector~~~~");
   for(;*tokenVec; tokenVec++){
-    print(*tokenVec);
+    println(*tokenVec);
   }
-  print("~~~~~~~~~~~~~~\n");
+  println("~~~~~~~~~~~~~~");
 }
 
 void freeTokens(char **tokenVec){
@@ -74,6 +76,36 @@ char *findPath(char **argv, char **envp){
   return path;
 }
 
+char ***getCommands(char **argv){
+  print("in getCommands\n");
+  char **temp = argv;
+  // count commands
+  int count = 1;
+  while(*temp){
+    println(*temp);
+    if(**temp == '|'){
+      count++;
+    }
+    temp++;
+  }
+  char ***command =  calloc(count+1, sizeof(char **));
+  char ***temp2 = command;
+  printf("id1: %d\n", count);
+
+  for(int i=1; i < count; i++){
+    println(*argv);
+    *temp2 = argv;
+    temp2++;
+    while(**argv != '|')
+     argv++;
+    *argv = '\0';
+    argv++;
+  }
+  *temp2 = argv;
+  println("exit getCommands");
+  return command;
+}
+
 void runCommand(char **argv, char **envp){
   // get path for the executable
   char *path = findPath(argv, envp);;
@@ -91,8 +123,21 @@ void runCommand(char **argv, char **envp){
   exit(0);
 }
 
+void runCommands(char ** argv, char **envp){
+  print("in runCommands\n");
+  char ***command = getCommands(argv);
+  println("back in run--s");
+  while(*command){
+    printVec(*command);
+    command++;
+  }
+  print("exit runCommands\n");
+  exit(0);
+}
+
 int main(int argc, char **argv, char **envp){
   char buf[128];
+  int fd[2];
 
   for(;;){    
     write(1, "$ ", 2);
@@ -105,12 +150,12 @@ int main(int argc, char **argv, char **envp){
     if(tokenVec[0] &&
        !strcmp(tokenVec[0], "exit") &&
        !tokenVec[1])
-	break;
+      break;
 
     pid_t pid = fork();
     if(pid == 0)
       // run command with child process
-      runCommand(tokenVec, envp);
+      runCommands(tokenVec, envp);
     else
       // parent waits for the child to finish
       wait(NULL);
