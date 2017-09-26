@@ -36,7 +36,7 @@ char **getPATH(char **envp){
 }
 
 char *findPath(char **argv, char **envp){
-  char *temp = '\0';
+  char *temp = "";
   // get environment variable
   char **PATH = getPATH(envp);
   // search for command
