@@ -1,6 +1,8 @@
 #include <unistd.h>
 
 int main(){
-  sleep(1);
-  write(1, "Hello world!\n", 13);
+  for(int i=0; i<10; i++){
+    sleep(1);
+    write(1, "Hello world!\n", 13);
+  }
 }

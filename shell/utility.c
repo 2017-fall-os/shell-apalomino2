@@ -6,6 +6,11 @@
   write(1, buf, strlen(buf));
  }
 
+void println(char *buf){
+  print(buf);
+  print("\n");
+}
+
 int strlen(char *str){
   int count = 0;
   while(*str){
