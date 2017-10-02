@@ -153,6 +153,17 @@ int main(int argc, char **argv, char **envp){
        !strcmp(tokenVec[0], "exit") &&
        !tokenVec[1])
       break;
+    if(!strcmp(tokenVec[0], "cd")){
+      if(tokenVec[1]){
+	int retVal = chdir(tokenVec[1]);
+	if(retVal)
+	  println("unable to change directory");
+      }
+      else{
+	println("no directory given");
+      }
+      continue;
+    }
 
     int count = countTokens(buf, ' ');
     char **command = mytoc(buf, '|');
