@@ -1,7 +1,7 @@
 all: myShell hello boo pipetest
 
 clean:
-	rm -f *.o myShell hello pipetest
+	rm -f *.o myShell hello pipetest boo
 clear:
 	rm *~ *#*
 demo:
