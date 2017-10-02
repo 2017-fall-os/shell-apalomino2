@@ -1,10 +1,12 @@
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <sys/wait.h>
 #include "mytoc.h"
 #include "utility.h"
 
-#include <stdio.h>
+#define READ_END 0
+#define WRITE_END 1
 
 void printVec(char **tokenVec){
   println("~~~~Vector~~~~");
@@ -76,44 +78,15 @@ char *findPath(char **argv, char **envp){
   return path;
 }
 
-char ***getCommands(char **argv){
-  print("in getCommands\n");
-  char **temp = argv;
-  // count commands
-  int count = 1;
-  while(*temp){
-    println(*temp);
-    if(**temp == '|'){
-      count++;
-    }
-    temp++;
-  }
-  char ***command =  calloc(count+1, sizeof(char **));
-  char ***temp2 = command;
-  printf("id1: %d\n", count);
-
-  for(int i=1; i < count; i++){
-    println(*argv);
-    *temp2 = argv;
-    temp2++;
-    while(**argv != '|')
-     argv++;
-    *argv = '\0';
-    argv++;
-  }
-  *temp2 = argv;
-  println("exit getCommands");
-  return command;
-}
-
 void runCommand(char **argv, char **envp){
   // get path for the executable
-  char *path = findPath(argv, envp);;
+  char *path = findPath(argv, envp);
   if(*path){
+    print("running: ");
+    println(path);
     int retVal = execve(path, argv, envp);
     print("Program terminated with exit code \n");
-    // print exit code
-    free(path);
+    // TODO: print exit code
   }
   else {
     print("command not found\n");
@@ -123,43 +96,89 @@ void runCommand(char **argv, char **envp){
   exit(0);
 }
 
-void runCommands(char ** argv, char **envp){
+void runCommands(char **command, char **envp){
   print("in runCommands\n");
-  char ***command = getCommands(argv);
-  println("back in run--s");
-  while(*command){
-    printVec(*command);
-    command++;
+  char **argv0 = mytoc(command[0], ' ');
+  char **argv1 = mytoc(command[1], ' ');
+  int stdin_copy = dup(0);
+  int stdout_copy = dup(1);
+  pid_t pid, ls_pid, sort_pid;
+  int pipefd[2];
+  pipe(pipefd);
+
+  pid = fork();
+  if(pid == 0){
+    println("child:");
+
+    close(1);
+    dup(pipefd[1]);
+    close(pipefd[0]);
+    close(pipefd[1]);
+    runCommand(argv0, envp);
   }
+  else{
+    println("parent:");
+    close(0);
+    dup(pipefd[0]);
+    close(pipefd[1]);
+    close(pipefd[0]);
+    
+    pid = fork();
+    if(pid == 0){
+      runCommand(argv1, envp);
+    }
+    else{
+      wait(NULL);
+    }
+  }
+
+  dup2(stdin_copy, 0);
+  dup2(stdout_copy, 1);
   print("exit runCommands\n");
-  exit(0);
 }
 
 int main(int argc, char **argv, char **envp){
   char buf[128];
   int fd[2];
+  pid_t pid;
 
   for(;;){    
-    write(1, "$ ", 2);
+    print("$ ");
     int bufSize = read(0, buf, 128);
     buf[bufSize-1] = '\0';
-    // tokenVec will be the argv for the command
+
     char **tokenVec = mytoc(buf, ' ');
-    
     // Check if exiting the program
     if(tokenVec[0] &&
        !strcmp(tokenVec[0], "exit") &&
        !tokenVec[1])
       break;
 
-    pid_t pid = fork();
-    if(pid == 0)
-      // run command with child process
-      runCommands(tokenVec, envp);
-    else
-      // parent waits for the child to finish
-      wait(NULL);
-
+    int count = countTokens(buf, ' ');
+    char **command = mytoc(buf, '|');
+    if(command[0] && command[1]){
+      runCommands(command, envp);
+    }
+    else if(count > 1 && !strcmp(tokenVec[count-1], "&")){
+      pid = fork();
+      if(pid == 0){
+	tokenVec[count-1] = '\0';
+	free(tokenVec[count]);
+	runCommand(tokenVec, envp);
+      }
+    }
+    else {
+      pid = fork();
+      if(pid == 0){
+	runCommand(tokenVec, envp);
+      }
+      else{
+	wait(NULL);
+      }
+    }
+    
+    freeTokens(command);
+    free(command);
     freeTokens(tokenVec);
     free(tokenVec);
   }
