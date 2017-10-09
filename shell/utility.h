@@ -2,6 +2,8 @@ void print(char *buf);
 
 void println(char *buf);
 
+void printerr(char *buf);
+
 int strlen(char *str);
 
 int strcmp(char *str1, char *str2);

@@ -32,6 +32,8 @@ char **getPATH(char **envp){
     freeTokens(temp);
     free(temp);
   }
+
+  // get each directory
   char **PATH = mytoc(temp[1], ':');
   
   freeTokens(temp);
@@ -81,15 +83,15 @@ char *findPath(char **argv, char **envp){
 void runCommand(char **argv, char **envp){
   // get path for the executable
   char *path = findPath(argv, envp);
+
+  // execute if it exists
   if(*path){
-    print("running: ");
-    println(path);
     int retVal = execve(path, argv, envp);
-    print("Program terminated with exit code \n");
+    printerr("Program terminated with exit code \n");
     // TODO: print exit code
   }
   else {
-    print("command not found\n");
+    printerr("command not found\n");
   }
   
   free(path);
@@ -97,80 +99,87 @@ void runCommand(char **argv, char **envp){
 }
 
 void runCommands(char **command, char **envp){
-  print("in runCommands\n");
   char **argv0 = mytoc(command[0], ' ');
   char **argv1 = mytoc(command[1], ' ');
   int stdin_copy = dup(0);
   int stdout_copy = dup(1);
-  pid_t pid, ls_pid, sort_pid;
+  pid_t pid, pid2;
   int pipefd[2];
-  pipe(pipefd);
 
+  pipe(pipefd);
   pid = fork();
   if(pid == 0){
-    println("child:");
-
+    // run first command with child
+    // redirect ouput to pipe
     close(1);
     dup(pipefd[1]);
     close(pipefd[0]);
     close(pipefd[1]);
+    // execute the command
     runCommand(argv0, envp);
   }
   else{
-    println("parent:");
+    // redirect input to pipe
     close(0);
     dup(pipefd[0]);
     close(pipefd[1]);
     close(pipefd[0]);
     
-    pid = fork();
-    if(pid == 0){
+    pid2 = fork();
+    if(pid2 == 0){
+      // run second command with child
       runCommand(argv1, envp);
-    }
-    else{
-      wait(NULL);
     }
   }
 
+  //wait for both children
+  wait(NULL);
+  wait(NULL);
+  // restore stdout and stdin
   dup2(stdin_copy, 0);
   dup2(stdout_copy, 1);
-  print("exit runCommands\n");
 }
 
 int main(int argc, char **argv, char **envp){
   char buf[128];
-  int fd[2];
   pid_t pid;
 
   for(;;){    
     print("$ ");
     int bufSize = read(0, buf, 128);
+    // remove newline char
     buf[bufSize-1] = '\0';
-
     char **tokenVec = mytoc(buf, ' ');
-    // Check if exiting the program
-    if(tokenVec[0] &&
-       !strcmp(tokenVec[0], "exit") &&
-       !tokenVec[1])
+
+    // check if input was given
+    if(!tokenVec[0])
+      continue;
+    // check if exiting the program
+    if(!strcmp(tokenVec[0], "exit") && !tokenVec[1])
       break;
+
+    //check if chaging directory
     if(!strcmp(tokenVec[0], "cd")){
       if(tokenVec[1]){
 	int retVal = chdir(tokenVec[1]);
 	if(retVal)
-	  println("unable to change directory");
+	  printerr("unable to change directory\n");
       }
       else{
-	println("no directory given");
+	printerr("no directory given\n");
       }
       continue;
     }
 
+    // perform commands
     int count = countTokens(buf, ' ');
     char **command = mytoc(buf, '|');
     if(command[0] && command[1]){
+      // a pipe was entered
       runCommands(command, envp);
     }
     else if(count > 1 && !strcmp(tokenVec[count-1], "&")){
+      // a background command was entered
       pid = fork();
       if(pid == 0){
 	tokenVec[count-1] = '\0';
@@ -179,6 +188,7 @@ int main(int argc, char **argv, char **envp){
       }
     }
     else {
+      // a simple command was entered
       pid = fork();
       if(pid == 0){
 	runCommand(tokenVec, envp);
@@ -187,7 +197,8 @@ int main(int argc, char **argv, char **envp){
 	wait(NULL);
       }
     }
-    
+
+    // clean up
     freeTokens(command);
     free(command);
     freeTokens(tokenVec);

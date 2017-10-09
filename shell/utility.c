@@ -2,13 +2,17 @@
 #include <stdlib.h>
 #include "utility.h"
 
- void print(char *buf){
+void print(char *buf){
   write(1, buf, strlen(buf));
- }
+}
 
 void println(char *buf){
   print(buf);
   print("\n");
+}
+
+void printerr(char *buf){
+  write(2, buf, strlen(buf));
 }
 
 int strlen(char *str){
