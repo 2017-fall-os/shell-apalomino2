@@ -145,7 +145,7 @@ int main(int argc, char **argv, char **envp){
   pid_t pid;
 
   for(;;){    
-    print("$ ");
+    //print("$ ");
     int bufSize = read(0, buf, 128);
     // remove newline char
     buf[bufSize-1] = '\0';
